@@ -1,0 +1,359 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Bengaluru Radius Finder</title><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: control bar on top, then radar + results side by side; stacks on phones. Tool-style, not editorial. */
+:root{
+  --bg:#f3f6f8; --surface:#ffffff; --fg:#13202a; --muted:#5a6b78; --line:#d8e0e6;
+  --accent:#0a6f70; --accent-fg:#ffffff; --accent-soft:#dff1f0; --tint:#fff3bf; --warn:#9a5b00;
+  --font-display:'Space Grotesk','Inter',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e161c; --surface:#16212a; --fg:#e5edf2; --muted:#92a3b0; --line:#26353f;
+    --accent:#3fc4b9; --accent-fg:#06211f; --accent-soft:#12312f; --tint:#4b4010; --warn:#e0a84a; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e161c; --surface:#16212a; --fg:#e5edf2; --muted:#92a3b0; --line:#26353f;
+  --accent:#3fc4b9; --accent-fg:#06211f; --accent-soft:#12312f; --tint:#4b4010; --warn:#e0a84a; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--font-body); font-size:14px; line-height:1.5;
+  padding-block:20px 40px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap{max-width:1240px; margin:0 auto; display:flex; flex-direction:column; gap:16px}
+h1{font-family:var(--font-display); font-size:26px; line-height:1.15; margin:0; text-wrap:balance; letter-spacing:-.01em}
+.sync{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:10px; font-size:13px; color:var(--muted)}
+.sync.ok::before,.sync.err::before{content:""; width:8px; height:8px; border-radius:50%; background:var(--accent)}
+.sync.err{color:var(--fg)} .sync.err::before{background:var(--warn)}
+.sync button{height:28px; padding:0 10px; font-size:13px}
+td.poss{max-width:280px; font-size:13px}
+.sub{color:var(--muted); margin:4px 0 0; max-width:70ch}
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px}
+.controls{display:grid; grid-template-columns:repeat(12,1fr); gap:12px}
+.field{display:flex; flex-direction:column; gap:4px; min-width:0}
+.field label,.lbl{font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
+.c-origin{grid-column:span 5}.c-radius{grid-column:span 3}.c-sort{grid-column:span 2}.c-inc{grid-column:span 2}
+.c-b{grid-column:span 3}.c-g{grid-column:span 2}.c-r{grid-column:span 2}.c-p{grid-column:span 3}.c-poss{grid-column:span 2}
+.c-ex{grid-column:span 5}.c-exr{grid-column:span 3}.c-hub{grid-column:span 4}
+td.hubs{max-width:260px; font-size:12px; color:var(--muted)}
+mark{background:var(--tint); color:inherit; border-radius:2px}.c-ma,.c-mw,.c-ms{grid-column:span 4}
+.mline{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:baseline}
+.mmeta{display:block; font-size:12px; color:var(--muted)}
+.c-type{grid-column:span 12}
+input[type=text],select{
+  width:100%; height:36px; padding:0 10px; border:1px solid var(--line); border-radius:6px;
+  background:var(--bg); color:var(--fg); font:inherit; min-width:0;
+}
+input[type=range]{width:100%; accent-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.radrow{display:flex; align-items:center; gap:10px; height:36px}
+.radval{font-family:var(--font-display); font-weight:600; font-size:18px; min-width:58px; text-align:right; font-variant-numeric:tabular-nums}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chip{display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border:1px solid var(--line); border-radius:999px; cursor:pointer; user-select:none; background:var(--bg)}
+.chip input{accent-color:var(--accent); margin:0}
+.chip:has(input:checked){background:var(--accent-soft); border-color:var(--accent)}
+.inc{display:flex; align-items:center; gap:8px; height:36px}
+.inc input{accent-color:var(--accent)}
+.main{display:grid; grid-template-columns:340px minmax(0,1fr); gap:16px; align-items:start}
+.radar{display:flex; flex-direction:column; gap:8px}
+.radar svg{width:100%; height:auto; max-width:100%; display:block}
+.legend{display:flex; flex-wrap:wrap; gap:6px 14px; color:var(--muted); font-size:12px}
+.sw{display:inline-block; width:12px; height:12px; border-radius:3px; background:var(--tint); border:1px solid var(--line); vertical-align:-2px; margin-right:5px}
+.dotk{display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--accent); vertical-align:0; margin-right:5px}
+.summary{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px}
+.summary strong{font-family:var(--font-display); font-size:18px}
+button{font:inherit; height:34px; padding:0 14px; border-radius:6px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-fg); font-weight:600; cursor:pointer}
+button.ghost{background:transparent; color:var(--accent)}
+.tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:6px}
+table{border-collapse:collapse; width:100%; min-width:900px}
+th{position:sticky; top:0; text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--surface); padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap}
+td{padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.proj{font-weight:600; min-width:150px}
+td.num,th.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+td.sh{background:var(--tint)}
+.note{display:block; font-weight:400; color:var(--warn); font-size:12px; margin-top:2px}
+.approx{color:var(--muted); font-size:12px}
+.gr{display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; background:var(--accent-soft); color:var(--fg); border:1px solid var(--line); white-space:nowrap}
+.empty{padding:28px 12px; text-align:center; color:var(--muted)}
+.foot{color:var(--muted); font-size:12px; max-width:90ch}
+@media (max-width:900px){
+  .main{grid-template-columns:minmax(0,1fr)}
+  .c-origin,.c-radius,.c-sort,.c-inc,.c-b,.c-g,.c-r,.c-p,.c-poss,.c-ex,.c-exr,.c-hub,.c-ma,.c-mw,.c-ms{grid-column:span 6}
+  .c-origin{grid-column:span 12}
+}
+@media (max-width:520px){
+  .c-radius,.c-sort,.c-inc,.c-b,.c-g,.c-r,.c-p,.c-poss,.c-ex,.c-exr,.c-hub,.c-ma,.c-mw,.c-ms{grid-column:span 12}
+  h1{font-size:22px}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Bengaluru Radius Finder</h1>
+    <p class="sub">Browse the whole shared database, or pick a place and a radius to narrow it down. Sample project: each entry is a numbered project and shows builder grade, region, micro-market, nearest metro, nearby IT hubs, possession and property type.</p>
+    <div class="sync" id="sync"><span id="synctext">Starting…</span></div>
+  </header>
+
+  <section class="panel controls" aria-label="Search controls">
+    <div class="field c-origin">
+      <label for="origin">Search around</label>
+      <input type="text" id="origin" list="places" value="" autocomplete="off" placeholder="Leave blank to see all projects, or type a locality, landmark or lat, lng">
+      <datalist id="places"></datalist>
+      <datalist id="hubs"></datalist>
+    </div>
+    <div class="field c-radius">
+      <label for="radius">Radius</label>
+      <div class="radrow"><input type="range" id="radius" min="1" max="40" step="1" value="10"><span class="radval" id="radval">10 km</span></div>
+    </div>
+    <div class="field c-sort">
+      <label for="sort">Sort by</label>
+      <select id="sort"><option value="d">Distance</option><option value="y">Possession, earliest</option><option value="m">Nearest metro first</option></select>
+    </div>
+    <div class="field c-inc">
+      <label for="inc">Location quality</label>
+      <label class="inc"><input type="checkbox" id="inc"> Include region-level only</label>
+    </div>
+    
+    <div class="field c-g"><label for="fg">Builder grade</label><select id="fg"></select></div>
+    <div class="field c-r"><label for="fr">Region</label><select id="fr"></select></div>
+        <div class="field c-poss"><label for="fy">Possession by</label>
+      <select id="fy"><option value="0">Any time</option><option value="2026">Ready / 2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2030">2030</option><option value="2031">2031</option></select></div>
+    <div class="field c-ma"><label for="fma">Metro availability</label><select id="fma"><option value="">Any</option><option value="op">Operational metro nearby</option><option value="up">Upcoming / under construction</option><option value="none">No metro info</option></select></div>
+    <div class="field c-mw"><label for="fmw">Closest metro within</label><select id="fmw"><option value="">Any distance</option><option value="0.5">0.5 km</option><option value="1">1 km</option><option value="2">2 km</option><option value="3">3 km</option><option value="5">5 km</option><option value="10">10 km</option></select></div>
+    <div class="field c-ms"><label for="fms">Nearest metro station</label><select id="fms"></select></div>
+    <div class="field c-ex"><label for="ex">Exclude projects near</label><input type="text" id="ex" list="places" value="" autocomplete="off" placeholder="Optional, e.g. MG Road"></div>
+    <div class="field c-exr"><label for="exr">Exclusion radius</label><div class="radrow"><input type="range" id="exr" min="1" max="15" step="1" value="3"><span class="radval" id="exval">3 km</span></div></div>
+    <div class="field c-hub"><label for="fh">IT hub</label><input type="text" id="fh" list="hubs" value="" autocomplete="off" placeholder="e.g. ITPL, Manyata, Ecoworld"></div>
+    <div class="field c-type"><span class="lbl">Property type</span><div class="chips" id="types"></div></div>
+  </section>
+
+  <div class="main">
+    <aside class="panel radar" aria-label="Radar view">
+      <span class="lbl">Radar, north is up</span>
+      <svg id="radar" viewBox="0 0 320 320" role="img" aria-label="Projects plotted around the chosen place"></svg>
+      <div class="legend"><span><span class="dotk"></span>Project</span><span><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-2px"><path d="M6 0v12M0 6h12" stroke="currentColor" stroke-width="2"/></svg> Search point</span></div>
+      <p class="foot" id="radnote"></p>
+    </aside>
+
+    <section class="panel" aria-label="Results">
+      <div class="summary"><strong id="count"></strong><button id="copy" class="ghost" type="button">Copy list</button></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th>Project</th><th>Builder grade</th><th>Region</th><th>Micro-market</th><th>Nearest metro</th><th>Nearby IT hubs</th><th>Possession</th><th>Type</th><th class="num">Distance</th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="foot" style="margin-top:10px">Sample dataset for portfolio purposes. Locations, metro details and possession dates are AI-generated and approximate, so verify them before relying on them. Metro and search distances are straight-line, not road or walking distance.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+/* Micro-market centres: [lat, lng, label]. Approximate, placed by locality. */
+const K={
+ARENUR:[12.755,77.775,"Arenur, Anekal (Attibele Rd)"],BOMMA:[12.812,77.699,"Bommasandra, Hosur Rd"],BOMMA2:[12.820,77.690,"Bommasandra, Electronic City"],
+SARJ:[12.860,77.786,"Sarjapur Road"],DOMMA:[12.880,77.757,"Dommasandra, Sarjapur Rd"],CHIKVAD:[12.916,77.766,"Chikkavaderapura, Varthur–Sarjapur Rd"],
+GUNJUR:[12.940,77.760,"Gunjur, Varthur–Sarjapur Rd"],CHEMBEN:[12.840,77.775,"Chembenahalli, Sarjapur"],CHIKDUN:[12.870,77.800,"Chikkadunnasandra, Sarjapur"],
+CHIKTIR:[12.835,77.800,"Chikka Tirupathi Rd, Sarjapur"],KODATHI:[12.909,77.738,"Kodathi, off Sarjapur Rd"],TRL:[12.889,77.760,"Varthur–Sarjapur Rd, Dommasandra Circle"],
+HADOS:[12.900,77.734,"Hadosiddapura, off Sarjapur Rd"],SINGA:[12.883,77.643,"Singasandra, off Hosur Rd"],KUDLU:[12.896,77.646,"Kudlu Gate, Hosur Rd"],
+HUSKUR:[12.810,77.690,"Huskur Rd, Hebbagodi (E-City Ph 2)"],HSR:[12.912,77.640,"HSR Layout"],HOPEF:[12.984,77.752,"Hope Farm Jn, Whitefield"],
+ITPL:[12.985,77.738,"Siddapura, ITPL, Whitefield"],FOLIUM:[12.956,77.760,"Whitefield, near Palm Meadows"],SOUKYA:[12.965,77.815,"Soukya Rd, Whitefield extension"],
+GRAN:[13.005,77.790,"Whitefield–Kadugodi / Seegehalli"],PANATH:[12.933,77.714,"Panathur, off Marathahalli–ORR"],MUNNE:[12.960,77.716,"Munnekollal, Marathahalli"],
+THUBA:[12.956,77.737,"Thubarahalli, Marathahalli"],BUDIG:[13.046,77.770,"Budigere Cross"],KRP:[13.009,77.700,"Bhattarahalli, KR Puram"],
+HOSKOTE:[13.030,77.800,"Hoskote, Old Madras Rd"],THANI:[13.062,77.637,"Thanisandra Main Rd"],GWOODS:[13.078,77.645,"Srinivaspur, Thanisandra"],
+HEBBAL:[13.036,77.597,"Hebbal"],HENNUR:[13.035,77.640,"Hennur Main Rd"],YELA:[13.110,77.585,"Yelahanka"],ATTUR:[13.100,77.575,"Atturu Rd, Yelahanka"],
+DODDA:[13.150,77.560,"Doddaballapur Rd, Yelahanka"],BISUV:[13.160,77.545,"Bisuvanahalli, Doddaballapur Rd"],JAKKUR:[13.078,77.606,"Jakkur"],
+THARA:[13.165,77.600,"Tharahunise, Yelahanka"],EMBSP:[13.235,77.690,"Devanahalli, Airport Road"],SKYE:[13.255,77.730,"Devanahalli, Airport Rd"],
+DEVAN:[13.245,77.712,"Devanahalli"],ORCH:[13.216,77.714,"Devanahalli"],IVC:[13.230,77.705,"IVC Rd, Devanahalli"],
+KIADB:[13.170,77.720,"KIADB Aerospace Park, Bagalur"],PANO:[13.270,77.700,"NH 44, beyond the airport"],BANNER:[12.889,77.600,"Kalena Agrahara, Bannerghatta Rd"],
+HULI:[12.880,77.608,"Hulimavu / Begur, Bannerghatta Rd"],BILVA:[12.790,77.585,"Bilvaradahalli, Bannerghatta Rd"],ANJAN:[12.856,77.562,"Anjanapura, JP Nagar 9th Phase"],JPN:[12.900,77.585,"JP Nagar"],
+KANAK:[12.810,77.525,"Kanakapura Rd, Brigade Meadows"],KONAN:[12.883,77.563,"Konanakunte, Kanakapura Rd"],VAJRA:[12.873,77.545,"Vajarahalli, Kanakapura Rd"],
+KENGERI:[12.900,77.445,"Kengeri, Mysore Rd"],JNANA:[12.950,77.500,"Jnanabharathi, Mysore Rd"],RRNAG:[12.919,77.470,"RR Nagar, Mysore Rd"],
+MAGADI:[12.970,77.510,"Magadi Rd, Kempapura Agrahara"],LALBAGH:[12.952,77.596,"Lalbagh Rd, Sudhama Nagar"],KORA:[12.935,77.620,"Koramangala"],BIDADI:[12.800,77.390,"Bidadi"],
+R:null
+};
+const RC={"North-East":[13.12,77.72],"North-West":[13.12,77.52],"South-West":[12.85,77.50],"North":[13.12,77.62],"South":[12.88,77.58],"East":[12.99,77.74],"West":[12.95,77.49],"South-East":[12.86,77.72],"Central":[12.96,77.59],"Sarjapur":[12.86,77.78]};
+/* Rows: builder, project, region, key, possession, type, starting price (Cr), price source (0 sheet, 1 web), note */
+const D=[];/* Search origins */
+const LM={"Manyata Tech Park":[13.047,77.620],"ITPL":[12.985,77.738],"Whitefield":[12.970,77.750],"Marathahalli":[12.956,77.697],"Bellandur":[12.926,77.676],
+"Sarjapur town":[12.860,77.786],"HSR Layout":[12.912,77.640],"Koramangala":[12.935,77.624],"Electronic City":[12.845,77.660],"Bommasandra":[12.812,77.699],
+"Bannerghatta Road":[12.880,77.600],"JP Nagar":[12.910,77.585],"Kanakapura Road":[12.883,77.563],"Hebbal":[13.036,77.597],"Yelahanka":[13.101,77.596],
+"Devanahalli":[13.248,77.710],"Kempegowda Airport":[13.199,77.707],"Hennur":[13.035,77.640],"Thanisandra":[13.062,77.637],"KR Puram":[13.007,77.696],
+"Indiranagar":[12.978,77.641],"MG Road":[12.975,77.605],"Majestic":[12.977,77.572],"Hoskote":[13.070,77.798],"Kengeri":[12.900,77.483],"Rajajinagar":[12.991,77.552],
+"Jayanagar":[12.925,77.593],"Silk Board":[12.917,77.623],"Dommasandra":[12.880,77.757],"Mysore Road":[12.940,77.500],"Peenya":[13.029,77.520],"Bagalur":[13.120,77.715],"Budigere":[13.046,77.770],
+"Varthur":[12.940,77.742],"Hosur Road":[12.890,77.640]};
+const $=id=>document.getElementById(id);
+const fmtP=p=>p==null?"—":(p<1?"₹"+Math.round(p*100)+" L":"₹"+(+p.toFixed(2))+" Cr");
+const yr=s=>{if(/ready|complet/i.test(s))return 2026;const m=s.match(/20\d\d/g);return m?+m[0]:null};
+const gradeOf=()=>"Unrated";
+
+const nb=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]+/g,"");
+const nn=x=>String(x||"").toLowerCase().replace(/[’']/g,"").replace(/\(.*?\)/g,"").replace(/[^a-z0-9]+/g,"");
+const LEG={};
+D.forEach(r=>{LEG[nb(r[0])+"|"+nn(r[1])]={type:r[5],price:r[6],web:r[7]===1}});
+function legacyP(){
+  return D.map(r=>{
+    const k=K[r[3]], c=k?[k[0],k[1]]:RC[r[2]];
+    return {g:gradeOf(r[0]),b:r[0],n:r[1],reg:r[2],micro:k?k[2]:"To be verified",inf:!k,lat:c[0],lng:c[1],exact:!!k,poss:r[4],type:r[5],price:r[6],web:r[7]===1,note:r[8]||"",y:yr(r[4]),mst:"",ml:"",md:null,mav:"none",hubs:""};
+  });
+}
+
+function parsePrice(raw,hdr){
+  const t=String(raw||"").toLowerCase().replace(/[₹,\s]/g,"");
+  const m=t.match(/(\d+(?:\.\d+)?)/); if(!m)return null;
+  let v=+m[1];
+  if(/lakh|lac|l$/.test(t)||(/lakh|\(l\)|\blac/.test(hdr)&&!/cr/.test(t)))v=v/100;
+  return v;
+}
+function rowsToP(v){
+  const H=(v[0]||[]).map(h=>String(h||"").trim().toLowerCase());
+  const ix=(...res)=>{for(const re of res){const i=H.findIndex(h=>re.test(h));if(i>=0)return i}return -1};
+  const C={b:ix(/client|builder/),n:ix(/project/),ll:ix(/lat\s*\/?\s*(long|lng)/),poss:ix(/possession/),micro:ix(/micro/),reg:ix(/standardi[sz]ed region/,/^region/),price:ix(/starting price|^price/),type:ix(/property type|^type$/),mst:ix(/nearest.*metro|metro station/),ml:ix(/^metro line/),md:ix(/(straight-line|approx).*dist|dist.*\(km\)/),mstat:ix(/^metro status/),hubs:ix(/it .*hub|employment hub/)};
+  if(C.b<0||C.n<0)throw {code:"columns"};
+  const cell=(r,i)=>i<0||r[i]==null?"":String(r[i]).trim();
+  const out=[];
+  v.slice(1).forEach(r=>{
+    const b=cell(r,C.b), n=cell(r,C.n); if(!b||!n)return;
+    const reg=cell(r,C.reg)||"—";
+    const m=cell(r,C.ll).match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+    let lat=m?+m[1]:null,lng=m?+m[2]:null;
+    if(lat==null||lat<11||lat>15||lng<76||lng>79){lat=null;lng=null}
+    const exact=lat!=null;
+    if(!exact){const c=RC[reg]||[12.97,77.59];lat=c[0];lng=c[1]}
+    const lg=LEG[nb(b)+"|"+nn(n)]||{};
+    const mst=cell(r,C.mst), mlr=cell(r,C.ml), mdn=parseFloat(cell(r,C.md)), mstat=cell(r,C.mstat);
+    const mav=/operational/i.test(mstat)?"op":/construction|planned|proposed|upcoming|future|under/i.test(mstat)?"up":mst?"op":"none";
+    const sp=C.price>=0?parsePrice(cell(r,C.price),H[C.price]):null;
+    const micro=cell(r,C.micro)||"To be verified";
+    const poss=cell(r,C.poss)||"—";
+    out.push({g:(b.match(/Grade (A\+?) builder/)||[])[1]||"Unrated",b,n,reg,micro,inf:/verif/i.test(micro),lat,lng,exact,poss,
+      type:cell(r,C.type)||lg.type||"—",price:sp!=null?sp:(lg.price??null),web:sp!=null?false:!!lg.web,note:"",y:yr(poss),mst,ml:mlr,md:isNaN(mdn)?null:mdn,mav,mstat,hubs:cell(r,C.hubs)});
+  });
+  return out;
+}
+let P=[], loading=true;
+const LC={purple:"#7b2d9e",green:"#2e9e4f",yellow:"#e0b000",pink:"#e6529c",blue:"#2f6fd6",red:"#d6322f",orange:"#e8820c"};
+const esc=t=>String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const hubCell=(t,q)=>{
+  if(!t)return "<span class='approx'>—</span>";
+  let h=esc(t);
+  if(q){const re=new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi");h=h.replace(re,m=>"<mark>"+m+"</mark>")}
+  return h;
+};
+function hubTokens(t){const out=[];let d=0,cur="";for(const ch of String(t||"")){if(ch==="(")d++;if(ch===")")d=Math.max(0,d-1);if(d===0&&(ch===";"||ch===","||ch==="/")){out.push(cur);cur=""}else cur+=ch}out.push(cur);return out.map(x=>x.trim()).filter(x=>x.length>2)}
+const metroCell=p=>{
+  if(!p.mst)return "<span class='approx'>—</span>";
+  const c=LC[String(p.ml||"").toLowerCase()]||"#888";
+  return "<span class='mline' style='background:"+c+"'></span>"+p.mst+"<span class='mmeta'>"+(p.ml?p.ml+" line":"")+(p.md!=null?(p.ml?" · ":"")+p.md.toFixed(1)+" km":"")+(p.mav==="up"?" · "+(p.mstat||"upcoming"):"")+"</span>";
+};
+const dist=(a,b,c,d)=>{const R=6371,t=x=>x*Math.PI/180,dl=t(c-a),dg=t(d-b);const h=Math.sin(dl/2)**2+Math.cos(t(a))*Math.cos(t(c))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
+/* Setup controls */
+const dl=$("places");
+const fill=(id,first,vals)=>{const keep=$(id).value;$(id).innerHTML="<option value=''>"+first+"</option>"+vals.map(v=>"<option>"+v+"</option>").join("");if(vals.includes(keep))$(id).value=keep};
+fill("fg","All grades",["A+","A"]);
+function applyData(rows){
+  P=rows;
+  dl.innerHTML="";
+  Object.keys(LM).forEach(n=>{const o=document.createElement("option");o.value=n;dl.appendChild(o)});
+  
+  
+  fill("fr","All regions",[...new Set(P.map(p=>p.reg))].sort());
+  $("hubs").innerHTML=[...new Set(P.flatMap(p=>hubTokens(p.hubs)))].sort((a,b)=>a.localeCompare(b)).slice(0,300).map(h=>"<option value=\""+esc(h).replace(/"/g,"&quot;")+"\">").join("");
+  fill("fms","Any station",[...new Set(P.map(p=>p.mst).filter(Boolean))].sort());
+  const off=new Set([...document.querySelectorAll(".tc:not(:checked)")].map(x=>x.value));
+  const types=[...new Set(P.map(p=>p.type))].filter(t=>t!=="—").sort();
+  $("types").innerHTML=types.map(t=>"<label class='chip'><input type='checkbox' class='tc' value='"+t+"'"+(off.has(t)?"":" checked")+"> "+t+"</label>").join("")+"<label class='chip'><input type='checkbox' class='tc' value='—'"+(off.has("—")?"":" checked")+"> Type unknown</label>";
+  run();
+}
+function origin(id){
+  const v=$(id||"origin").value.trim();
+  const m=v.match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
+  if(m)return {lat:+m[1],lng:+m[2],name:v};
+  if(LM[v])return {lat:LM[v][0],lng:LM[v][1],name:v};
+  const key=Object.keys(LM).find(k=>k.toLowerCase()===v.toLowerCase())||Object.keys(LM).find(k=>k.toLowerCase().includes(v.toLowerCase())&&v.length>2);
+  if(key)return {lat:LM[key][0],lng:LM[key][1],name:key};
+  const q=v.replace(/^Project:\s*/i,"").replace(/\s*\(.*\)$/,"").toLowerCase();
+  const pr=P.find(p=>p.exact&&q.length>2&&p.n.toLowerCase().includes(q));
+  if(pr)return {lat:pr.lat,lng:pr.lng,name:pr.n};
+  return null;
+}
+let current=[];
+function run(){
+  $("radval").textContent=$("radius").value+" km";
+  const raw=$("origin").value.trim(), o=raw?origin("origin"):null, R=+$("radius").value, all=!raw;
+  $("radius").disabled=all; $("radius").closest(".field").style.opacity=all?0.5:1;
+  $("exval").textContent=$("exr").value+" km";
+  const exraw=$("ex").value.trim(), ex=exraw?origin("ex"):null, XR=+$("exr").value;
+  const sel=[...document.querySelectorAll(".tc:checked")].map(x=>x.value);
+  const fh=$("fh").value.trim(), fhl=fh.toLowerCase(), fma=$("fma").value,fmw=+$("fmw").value,fms=$("fms").value,fg=$("fg").value,fr=$("fr").value,fy=+$("fy").value,inc=$("inc").checked;
+  if(!all&&!o){$("count").textContent="Place not found";$("rows").innerHTML="<tr><td colspan='9' class='empty'>Pick a suggestion from the list, or type coordinates like 12.97, 77.75.</td></tr>";current=[];draw(null,R,[]);return}
+  let hidden=0,excluded=0;
+  let L=P.map(p=>({...p,d:all?null:dist(o.lat,o.lng,p.lat,p.lng)})).filter(p=>{
+    if(!all&&p.d>R)return false;
+    if(!all&&!p.exact&&!inc){hidden++;return false}
+    if(fhl&&!(p.hubs||"").toLowerCase().includes(fhl))return false; if(fma&&p.mav!==fma)return false; if(fmw&&(p.md==null||p.md>fmw))return false; if(fms&&p.mst!==fms)return false;
+    if(fg&&p.g!==fg)return false;  if(fr&&p.reg!==fr)return false;
+    if(!sel.includes(p.type))return false;
+    
+    if(fy&&(p.y==null||p.y>fy))return false;
+    if(ex&&dist(ex.lat,ex.lng,p.lat,p.lng)<=XR){excluded++;return false}
+    return true;
+  });
+  const s=$("sort").value;
+  L.sort((a,b)=>s==="pa"?(a.price??99)-(b.price??99):s==="pd"?(b.price??-1)-(a.price??-1):s==="y"?(a.y??9999)-(b.y??9999):s==="m"?(a.md??9999)-(b.md??9999):all?(a.b.localeCompare(b.b)||a.n.localeCompare(b.n)):a.d-b.d);
+  current=L;
+  $("count").textContent=L.length+(L.length===1?" project":" projects")+(all?" in the database":" within "+R+" km of "+o.name)+(ex?" · "+excluded+" hidden within "+XR+" km of "+ex.name:"")+(exraw&&!ex?" · exclude place not found":"");
+  $("rows").innerHTML=L.length?L.map(p=>{
+    const sh=p.inf?" class='sh'":"";
+    return "<tr><td class='proj'>"+p.n+(p.note?"<span class='note'>"+p.note+"</span>":"")+"</td><td>"+p.b+"<span class='gr'>"+p.g+"</span></td><td>"+p.reg+"</td><td"+sh+">"+p.micro+(p.exact?"":" <span class='approx'>(no pin – region-level)</span>")+"</td><td>"+metroCell(p)+"</td><td class='hubs'>"+hubCell(p.hubs,fh)+"</td><td class='poss'>"+p.poss+"</td><td>"+p.type+"</td><td class='num'>"+(p.d==null?"—":(p.exact?"":"≈ ")+p.d.toFixed(1)+" km")+"</td></tr>";
+  }).join(""):"<tr><td colspan='9' class='empty'>"+(loading?"Loading…":"No projects match. Increase the radius or loosen a filter.")+"</td></tr>";
+  $("radnote").textContent=all?"Showing the whole database. Type a place in Search around to see projects by radius.":hidden?hidden+" more in range have only a region-level location and are hidden. Tick “Include region-level only” to show them.":"Locations are blurred to about 1 km.";
+  draw(o,R,L);
+}
+function draw(o,R,L){
+  const svg=$("radar"),c=160,rad=140,css=getComputedStyle(document.documentElement);
+  const col=n=>css.getPropertyValue(n).trim();
+  if(!o){svg.innerHTML="<text x='160' y='160' font-size='12' text-anchor='middle' fill='"+col("--muted")+"'>Enter a place to see the radar</text>";return}
+  const kx=111.32*Math.cos(o.lat*Math.PI/180),ky=110.57;
+  let s="<circle cx='"+c+"' cy='"+c+"' r='"+rad+"' fill='"+col("--accent-soft")+"' stroke='"+col("--accent")+"' stroke-width='1.5'/>";
+  s+="<circle cx='"+c+"' cy='"+c+"' r='"+(rad/2)+"' fill='none' stroke='"+col("--line")+"' stroke-dasharray='3 4'/>";
+  s+="<path d='M"+c+" "+(c-rad)+"V"+(c+rad)+"M"+(c-rad)+" "+c+"H"+(c+rad)+"' stroke='"+col("--line")+"' stroke-width='1'/>";
+  s+="<text x='"+(c+rad/2+3)+"' y='"+(c-4)+"' font-size='10' fill='"+col("--muted")+"'>"+(R/2)+" km</text>";
+  s+="<text x='"+(c+rad-4)+"' y='"+(c-4)+"' font-size='10' text-anchor='end' fill='"+col("--muted")+"'>"+R+" km</text>";
+  s+="<text x='"+c+"' y='12' font-size='10' text-anchor='middle' fill='"+col("--muted")+"'>N</text>";
+  L.forEach(p=>{
+    const x=c+((p.lng-o.lng)*kx)/R*rad, y=c-((p.lat-o.lat)*ky)/R*rad;
+    s+="<circle cx='"+x.toFixed(1)+"' cy='"+y.toFixed(1)+"' r='4.5' fill='"+col("--accent")+"' fill-opacity='"+(p.exact?0.85:0.35)+"' stroke='"+col("--surface")+"' stroke-width='1'><title>"+p.n+" – "+p.d.toFixed(1)+" km</title></circle>";
+  });
+  s+="<path d='M"+c+" "+(c-8)+"V"+(c+8)+"M"+(c-8)+" "+c+"H"+(c+8)+"' stroke='"+col("--fg")+"' stroke-width='2.5'/>";
+  svg.innerHTML=s;
+}
+["origin","radius","sort","inc","fg","fr","fy","ex","exr","fma","fmw","fms","fh"].forEach(id=>{$(id).addEventListener(id==="origin"||id==="ex"||id==="fh"?"input":"change",run);if(id==="radius"||id==="exr")$(id).addEventListener("input",run)});
+$("types").addEventListener("change",run);
+$("copy").addEventListener("click",()=>{
+  const o=origin();
+  const t=current.map(p=>p.n+" ("+p.b+"), "+p.micro+", "+p.type+", possession "+p.poss+", "+(p.hubs?"IT hubs: "+p.hubs+", ":"")+(p.mst?"metro "+p.mst+(p.md!=null?" "+p.md.toFixed(1)+" km":"")+", ":"")+(p.d==null?"":"")+(p.d==null?"":"")+(p.d==null?"":"distance "+(p.exact?"":"≈ ")+p.d.toFixed(1)+" km")).join("\n");
+  const done=()=>{$("copy").textContent="Copied";setTimeout(()=>$("copy").textContent="Copy list",1500)};
+  const fb=()=>{const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");done()}catch(e){}ta.remove()};
+  try{navigator.clipboard.writeText(t).then(done,fb)}catch(e){fb()}
+});
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",run);
+
+/* ---------- Sample data ---------- */
+const SNAP=[["Client / Builder","Property / Project","Lat/Long","Property Type","Possession Timeline (Research)","Region","Micro-market","Nearest operational Metro","Metro line","Approx. straight-line distance (km)","Metro status","Nearby IT employment hubs"],["Grade A+ builder","Project 01","13.05, 77.75","Apartment","Phase 1: 31 Mar 2029; Phase 2: 31 Mar 2030","North-East","Budigere Cross–Old Madras Road","Whitefield (Kadugodi)","Purple","6.00","Operational","Whitefield–ITPL / EPIP Zone, KR Puram–Mahadevapura ORR offices; Manyata Tech Park across north-east corridor"],["Grade A+ builder","Project 02","13.10, 77.59","Apartment","31 Mar 2030","North","Hebbal–Jakkur","Yeshwanthpur","Green","9.50","Operational","Manyata Tech Park, Kirloskar Business Park, Bhartiya City business district; Hebbal commercial corridor"],["Grade A+ builder","Project 03","13.02, 77.71","Apartment","31 Mar 2031","East","Varthur–Whitefield belt","Garudacharapalya","Purple","3.50","Operational","ITPL / ITPB, EPIP Zone, Prestige Shantiniketan, Brigade Tech Gardens; ORR campuses via KR Puram"],["Grade A+ builder","Project 04","12.81, 77.70","Apartment","31 Oct 2030","South-East","Chandapura–Anekal","Bommasandra","Yellow","2.00","Operational","Electronic City (Phase 1 & 2), Infosys / Wipro campuses, Bommasandra industrial area; ORR via Hosa Road"],["Grade A builder","Project 05","13.09, 77.60","Apartment","2030–2031","North","Hebbal–Jakkur","Yeshwanthpur","Green","9.00","Operational","Manyata Tech Park, Kirloskar Business Park, Bhartiya City business district; Hebbal commercial corridor"],["Grade A builder","Project 06","13.11, 77.57","Apartment","31 Mar 2032","North","Yelahanka–Jakkur","Peenya","Green","9.00","Operational","Manyata Tech Park, Kirloskar Business Park, Bhartiya City business district; Hebbal commercial corridor"],["Grade A builder","Project 07","13.14, 77.57","Apartment","31 Dec 2031","North","Yelahanka–Jakkur","Jalahalli","Green","12.50","Operational","Manyata Tech Park, Kirloskar Business Park, Bhartiya City business district; Hebbal commercial corridor"],["Grade A builder","Project 08","12.96, 77.71","Apartment","31 Jul 2031","East","Varthur–Whitefield belt","Kundalahalli","Purple","2.50","Operational","ITPL / ITPB, EPIP Zone, Prestige Shantiniketan, Brigade Tech Gardens; ORR campuses via KR Puram"],["Grade A builder","Project 09","13.20, 77.62","Apartment","30 Sep 2030","North","Yelahanka–Doddaballapur Road","Jalahalli","Green","21.00","Operational","KIADB Aerospace Park / Hardware Park, Devanahalli Business Park and airport-linked commercial zone; Manyata Tech Park farther south"],["Grade A builder","Project 10","13.20, 77.62","Apartment","After Mar 2030; exact RERA completion date to confirm","North","Yelahanka–Doddaballapur Road","Peenya","Green","21.50","Operational","KIADB Aerospace Park / Hardware Park, Devanahalli Business Park and airport-linked commercial zone; Manyata Tech Park farther south"],["Grade A builder","Project 11","13.19, 77.60","Apartment – provisional","08 Oct 2030 (Phase 1); 08 Oct 2031 (Phase 2)","North","Yelahanka–Doddaballapur Road","Jalahalli","Green","19.00","Operational","KIADB Aerospace Park / Hardware Park, Devanahalli Business Park and airport-linked commercial zone; Manyata Tech Park farther south"],["Grade A+ builder","Project 12","12.89, 77.71","Apartment – provisional","Pre-launch with no RERA number, and a tentative possession of Dec 2030.","East","Varthur–Gunjur","Electronic City","Yellow","6.00","Operational","ORR tech corridor (Bellandur–Kadubeesanahalli–Marathahalli), Ecospace / Ecoworld, RMZ Ecoworld; Sarjapur Road offices"],["Grade A+ builder","Project 13","13.05, 77.78","Apartment","30 Sep 2031","North-East","Budigere Cross–Old Madras Road","Whitefield (Kadugodi)","Purple","6.50","Operational","Whitefield–ITPL / EPIP Zone, KR Puram–Mahadevapura ORR offices; Manyata Tech Park across north-east corridor"],["Grade A+ builder","Project 14","12.86, 77.75","Apartment","30 Oct 2029 (Phase 1); 31 Dec 2030 (Phase 2)","South-East","Sarjapur–Attibele corridor","Bommasandra","Yellow","8.00","Operational","Electronic City (Phase 1 & 2), Infosys / Wipro campuses, Bommasandra industrial area; ORR via Hosa Road"],["Grade A+ builder","Project 15","13.11, 77.63","Apartment","Not RERA-registered yet. One portal shows Dec 2030; another shows Dec 2031. Treat both as indicative.","North-East","Thanisandra–Hennur","Krishnarajapura","Purple","13.00","Operational","Manyata Tech Park, Kirloskar Business Park, Bhartiya City business district; Hebbal commercial corridor"],["Grade A+ builder","Project 16","13.07, 77.59","Apartment","28 Dec 2029","","","","","","",""],["Grade A+ builder","Project 17","12.87, 77.61","Apartment","Feb 2027 (public listing; exact phase registration to verify)","South","JP Nagar–Arekere","Kalena Agrahara","Pink","1.50","Operational","Bannerghatta Road commercial / institutional corridor, Electronic City, JP Nagar offices; Global Village Tech Park depending on location"],["Grade A+ builder","Project 18","12.87, 77.76","Apartment","Phased handover Dec 2028 onward; individual enclave dates extend to 2032","South-East","Sarjapur Road","Huskur Road","Yellow","10.00","Operational","ORR tech corridor (Bellandur–Kadubeesanahalli–Marathahalli), Ecospace / Ecoworld, RMZ Ecoworld; Sarjapur Road offices"],["Grade A+ builder","Project 19","12.99, 77.75","Apartment","Dec 2031 (phase/tower-level listing; verify)","East","Whitefield–Hope Farm","Hopefarm Channasandra","Purple","0.00","Operational","ITPL / ITPB, EPIP Zone, Prestige Shantiniketan, Brigade Tech Gardens; ORR campuses via KR Puram"],["Grade A+ builder","Project 20","12.99, 77.75","Apartment","Mar 2032 (public listing; verify exact phase)","North","Hebbal–Jakkur","Yeshwanthpur","Green","9.00","Operational","Manyata Tech Park, Kirloskar Business Park, Bhartiya City business district; Hebbal commercial corridor"],["Grade A+ builder","Project 21","12.87, 77.64","Apartment","Oct 2031","East","Whitefield–Hope Farm","Hopefarm Channasandra","Purple","0.00","Operational","ITPL / ITPB, EPIP Zone, Prestige Shantiniketan, Brigade Tech Gardens; ORR campuses via KR Puram"],["Grade A builder","Project 22","12.82, 77.57","Villas","Apr 2029","South","Bannerghatta Road–Gottigere","Kalena Agrahara","Pink","6.00","Operational","Bannerghatta Road commercial / institutional corridor, Electronic City, JP Nagar offices; Global Village Tech Park depending on location"],["Grade A builder","Project 23","12.87, 77.73","Apartment","Dec 2029 (Phase 1)","South-East","Sarjapur Road–Gunjur belt","Huskur Road","Yellow","7.50","Operational","ORR tech corridor (Bellandur–Kadubeesanahalli–Marathahalli), Ecospace / Ecoworld, RMZ Ecoworld; Sarjapur Road offices"],["Grade A builder","Project 24","12.85, 77.74","Apartment – provisional","Ready to move (verify OC / tower)","South-East","Sarjapur–Chandapura corridor","Bommasandra","Yellow","6.00","Operational","Electronic City (Phase 1 & 2), Infosys / Wipro campuses, Bommasandra industrial area; ORR via Hosa Road"],["Grade A builder","Project 25","12.89, 77.64","Apartment","01 Nov 2029","South-East","Begur–Hosa Road","Kudlu Gate","Yellow","0.00","Operational","Electronic City (Phase 1 & 2), Infosys / Wipro campuses, Bommasandra industrial area; ORR via Hosa Road"],["Grade A builder","Project 26","13.14, 77.67","Apartment","Completed / ready to move (OC verification recommended)","North-East","Thanisandra–Hennur","Krishnarajapura","Purple","16.00","Operational","Manyata Tech Park, Kirloskar Business Park, Bhartiya City business district; Hebbal commercial corridor"],["Grade A builder","Project 27","12.96, 77.59","Apartment","Ready to move (verify OC / phase)","Central","Central Bengaluru","Central College","Purple","1.50","Operational","Central Business District, MG Road / Residency Road offices, Richmond Road and Ulsoor commercial corridor"],["Grade A builder","Project 28","12.84, 77.69","Apartment","06 May 2029","South-East","Chandapura–Anekal","Huskur Road","Yellow","1.00","Operational","Electronic City (Phase 1 & 2), Infosys / Wipro campuses, Bommasandra industrial area; ORR via Hosa Road"],["Grade A+ builder","Project 29","12.93, 77.51","Apartment","15 Sep 2029","West","RR Nagar–Kengeri","Jnanabharathi","Purple","0.00","Operational","Global Village Tech Park, Kengeri industrial / education belt; Peenya–Yeshwanthpur farther north"],["Grade A+ builder","Project 30","12.86, 77.59","Apartment","31 Dec 2029","South","JP Nagar–Arekere","Kalena Agrahara","Pink","1.00","Operational","Bannerghatta Road commercial / institutional corridor, Electronic City, JP Nagar offices; Global Village Tech Park depending on location"],["Grade A+ builder","Project 31","13.17, 77.57","Apartment","Listed as ready to occupy. Its original slot was Dec 2024.","North","Yelahanka–Jakkur","Dasarahalli","Green","15.00","Operational","Manyata Tech Park, Kirloskar Business Park, Bhartiya City business district; Hebbal commercial corridor"],["Grade A+ builder","Project 32","13.21, 77.66","Apartment","Dec 2028 (Phase 1; other phases differ)","North-East","Devanahalli–Airport corridor","Krishnarajapura","Purple","23.00","Operational","KIADB Aerospace Park / Hardware Park, Devanahalli Business Park and airport-linked commercial zone; Manyata Tech Park farther south"],["Grade A+ builder","Project 33","12.90, 77.71","Apartment","31 May 2031","East","Varthur–Gunjur","Hosa Road","Yellow","6.50","Operational","ORR tech corridor (Bellandur–Kadubeesanahalli–Marathahalli), Ecospace / Ecoworld, RMZ Ecoworld; Sarjapur Road offices"],["Grade A+ builder","Project 34","12.93, 77.65","Apartment","31 May 2030","South-East","Bellandur–ORR / Hosa Road","Bommanahalli","Yellow","3.00","Operational","Ecospace / Ecoworld, RMZ Ecoworld, Cessna Business Park, Embassy TechVillage, ORR"],["Grade A+ builder","Project 35","12.88, 77.59","Apartment","30 Jun 2030 (Wing 5); 30 Dec 2030 (Wings 1 & 2)","South","JP Nagar–Arekere","Kalena Agrahara","Pink","1.00","Operational","Bannerghatta Road commercial / institutional corridor, Electronic City, JP Nagar offices; Global Village Tech Park depending on location"],["Grade A+ builder","Project 36","12.93, 77.72","Apartment","Dec 2026","East","Varthur–Whitefield belt","Nallurhalli","Purple","5.00","Operational","ITPL / ITPB, EPIP Zone, Prestige Shantiniketan, Brigade Tech Gardens; ORR campuses via KR Puram"],["Grade A builder","Project 37","12.99, 77.80","Apartment","31 Dec 2029","East","Hoskote–Whitefield East","Whitefield (Kadugodi)","Purple","5.00","Operational","ITPL / ITPB, EPIP Zone, Prestige Shantiniketan, Brigade Tech Gardens; ORR campuses via KR Puram"],["Grade A builder","Project 38","12.99, 77.75","Apartment","31 Aug 2030 (K-RERA); builder page says Aug 2030","East","Whitefield–Hope Farm","Kadugodi Tree Park","Purple","0.50","Operational","ITPL / ITPB, EPIP Zone, Prestige Shantiniketan, Brigade Tech Gardens; ORR campuses via KR Puram"],["Grade A builder","Project 39","12.96, 77.73","Apartment","31 Dec 2027","East","Varthur–Whitefield belt","Nallurhalli","Purple","2.00","Operational","ITPL / ITPB, EPIP Zone, Prestige Shantiniketan, Brigade Tech Gardens; ORR campuses via KR Puram"],["Grade A builder","Project 40","12.93, 77.71","Apartment","31 Dec 2029","East","Varthur–Gunjur","Kundalahalli","Purple","5.50","Operational","ORR tech corridor (Bellandur–Kadubeesanahalli–Marathahalli), Ecospace / Ecoworld, RMZ Ecoworld; Sarjapur Road offices"]];
+function setSync(kind,text){const el=$("sync");el.className="sync "+kind;$("synctext").textContent=text}
+const rows=rowsToP(SNAP);
+loading=false; applyData(rows); P.live=true;
+setSync("ok","Sample dataset · "+rows.length+" projects");
+</script>
+
+</body></html>
